@@ -50,5 +50,19 @@ resource "aws_eks_cluster" "voting" {
 }
 
 output "endpoint" {
-  value = "${aws_eks_cluster.voting.endpoint}"
+  value     = "${aws_eks_cluster.voting.endpoint}"
+}
+
+output "kubeconfig-certificate-authority-data" {
+  value     = "${aws_eks_cluster.voting.certificate_authority.0.data}"
+}
+
+output "client_key" {
+  value     = "${aws_eks_cluster.voting.master_auth.0.client_key}"
+  sensitive = true
+}
+
+output "client_certificate" {
+  value     = "${aws_eks_cluster.voting.master_auth.0.client_certificate}"
+  sensitive = true
 }
