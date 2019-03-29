@@ -1,6 +1,7 @@
 resource "aws_s3_bucket" "voting_artifact_store" {
-  bucket = "voting-pipeline"
-  acl    = "private"
+  bucket        = "voting-pipeline"
+  acl           = "private"
+  force_destroy = true
 }
 
 resource "aws_iam_role" "codepipeline" {
@@ -99,11 +100,11 @@ resource "aws_codepipeline" "voting_pipeline" {
       output_artifacts = ["code"]
 
       configuration = {
-        Owner  = "ongurd"
-        Repo   = "example-voting-app"
-        Branch = "master"
+        Owner                = "ongurd"
+        Repo                 = "example-voting-app"
+        Branch               = "master"
         PollForSourceChanges = "true"
-        OAuthToken = "${var.github_token}"
+        OAuthToken           = "${var.github_token}"
       }
     }
   }
@@ -112,12 +113,12 @@ resource "aws_codepipeline" "voting_pipeline" {
     name = "Build"
 
     action {
-      name            = "Build"
-      category        = "Build"
-      owner           = "AWS"
-      provider        = "CodeBuild"
-      input_artifacts = ["code"]
-      version         = "1"
+      name             = "Build"
+      category         = "Build"
+      owner            = "AWS"
+      provider         = "CodeBuild"
+      input_artifacts  = ["code"]
+      version          = "1"
       output_artifacts = ["codeBuild"]
 
       configuration = {

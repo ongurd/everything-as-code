@@ -7,5 +7,5 @@ variable "eks_desired_node_count" {}
 variable "eks_min_node_count" {}
 variable "eks_max_node_count" {}
 variable "vpc_id" {}
-
-variable depends_on { default = [], type = "list"}
+variable "region" {}
+variable "account_id" {}

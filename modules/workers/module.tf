@@ -1,5 +1,66 @@
+resource "null_resource" "eks_endpoint" {
+  triggers {
+    build_number = "${timestamp()}"
+  }
+
+  provisioner "local-exec" {
+    command = "bash ${path.module}/wait_eks.sh"
+
+    environment {
+      REGION_NAME  = "${var.region}"
+      PROFILE_NAME = "kloia"
+      PROJECT_NAME = "${var.project_name}"
+    }
+  }
+}
+
+resource "null_resource" "kube_config" {
+  depends_on = ["null_resource.eks_endpoint"]
+
+  triggers {
+    build_number = "${timestamp()}"
+  }
+
+  provisioner "local-exec" {
+    command = "rm -rf ~/.kube/kloia && aws eks --region ${var.region} update-kubeconfig --name ${var.project_name} --kubeconfig ~/.kube/kloia --profile kloia"
+  }
+}
+
+provider "kubernetes" {
+  config_context_cluster = "arn:aws:eks:${var.region}:${var.account_id}:cluster/${var.project_name}"
+}
+
+resource "kubernetes_config_map" "aws_auth" {
+  depends_on = ["null_resource.eks_endpoint"]
+
+  metadata {
+    name      = "aws-auth"
+    namespace = "kube-system"
+  }
+
+  data {
+    mapRoles = <<ROLES
+  |
+    - rolearn: ${aws_iam_role.voting_worker_node.arn}
+      username: system:node:{{EC2PrivateDNSName}}
+      groups:
+       - system:bootstrappers
+       - system:nodes
+ROLES
+  }
+}
+
+provider "helm" {
+  depends_on      = ["null_resource.eks_endpoint"]
+  install_tiller  = true
+  namespace       = "kube-system"
+  service_account = "tiller"
+  home            = "./.helm"
+}
+
 data "aws_subnet_ids" "private" {
   vpc_id = "${var.vpc_id}"
+
   tags {
     Tier = "Private"
   }
@@ -75,6 +136,8 @@ resource "aws_launch_configuration" "voting_worker_node" {
 
 # Auto Scaling Group
 resource "aws_autoscaling_group" "voting" {
+  depends_on = ["null_resource.eks_endpoint"]
+
   # desired_capacity     = "${var.eks_desired_node_count}"
   launch_configuration = "${aws_launch_configuration.voting_worker_node.id}"
   max_size             = "${var.eks_max_node_count}"
@@ -178,4 +241,8 @@ resource "aws_iam_policy_attachment" "auto_scaling_attachment" {
 
 output "config-map-aws-auth" {
   value = "${local.config-map-aws-auth}"
+}
+
+output "role_arn" {
+  value = "${aws_iam_role.voting_worker_node.arn}"
 }
