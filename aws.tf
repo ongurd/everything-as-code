@@ -1,4 +1,4 @@
 provider "aws" {
-    region = "${var.region}"
-    profile = "kloia"
+  region  = "${var.region}"
+  profile = "kloia"
 }
