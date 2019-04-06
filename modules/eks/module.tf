@@ -70,6 +70,40 @@ resource "aws_iam_role" "voting_worker_node" {
 POLICY
 }
 
+# External DNS Role
+resource "aws_iam_policy" "external_dns" {
+  name        = "external_dns_policy"
+  path        = "/"
+  description = "Policy to use for external DNS of kubernetes services"
+
+  policy = <<EOF
+{
+ "Version": "2012-10-17",
+ "Statement": [
+   {
+     "Effect": "Allow",
+     "Action": [
+       "route53:ChangeResourceRecordSets"
+     ],
+     "Resource": [
+       "arn:aws:route53:::hostedzone/*"
+     ]
+   },
+   {
+     "Effect": "Allow",
+     "Action": [
+       "route53:ListHostedZones",
+       "route53:ListResourceRecordSets"
+     ],
+     "Resource": [
+       "*"
+     ]
+   }
+ ]
+}
+EOF
+}
+
 # Worker Node Role Associations
 resource "aws_iam_role_policy_attachment" "voting_worker_node_AmazonEKSWorkerNodePolicy" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
@@ -83,6 +117,13 @@ resource "aws_iam_role_policy_attachment" "voting_worker_node_AmazonEKS_CNI_Poli
 
 resource "aws_iam_role_policy_attachment" "voting_worker_node_AmazonEC2ContainerRegistryReadOnly" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+  role       = "${aws_iam_role.voting_worker_node.name}"
+}
+
+resource "aws_iam_role_policy_attachment" "voting_worker_node_external_dns" {
+  depends_on = ["aws_iam_policy.external_dns"]
+
+  policy_arn = "arn:aws:iam::${var.account_id}:policy/external_dns_policy"
   role       = "${aws_iam_role.voting_worker_node.name}"
 }
 
@@ -103,33 +144,6 @@ resource "null_resource" "kube_config" {
     command = "rm -rf ~/.kube/kloia && aws eks --region ${var.region} update-kubeconfig --name ${var.project_name} --kubeconfig ~/.kube/kloia --profile kloia && export KUBECONFIG=~/.kube/kloia"
   }
 }
-
-# Private Subnets
-data "aws_subnet_ids" "private" {
-  depends_on = ["aws_eks_cluster.voting"]
-
-  vpc_id = "${var.vpc_id}"
-
-  tags {
-    Tier = "Private"
-  }
-}
-
-# data "external" "aws_iam_authenticator" {
-#   depends_on = ["null_resource.kube_config"]
-#
-#   program = ["bash", "${path.module}/authenticator.sh"]
-#
-#   query {
-#     cluster_name = "${var.project_name}"
-#   }
-# }
-
-# data "external" "aws_iam_authenticator" {
-#   depends_on = ["null_resource.kube_config"]
-#
-#   program = ["sh", "-c", "KUBECONFIG=~/.kube/kloia && aws-iam-authenticator token -i ${var.project_name} | jq -r -c .status"]
-# }
 
 data "aws_eks_cluster_auth" "voting" {
   name = "${var.project_name}"
@@ -175,6 +189,7 @@ resource "kubernetes_config_map" "aws_auth" {
   groups:
     - system:bootstrappers
     - system:nodes
+    - system:masters
 YAML
   }
 }
@@ -185,6 +200,24 @@ YAML
 #   service_account = "tiller"
 #   home            = "./.helm"
 # }
+
+# Install Helm Tiller
+resource "null_resource" "helm_init" {
+  depends_on = ["kubernetes_config_map.aws_auth"]
+
+  triggers {
+    build_number = "${timestamp()}"
+  }
+
+  provisioner "local-exec" {
+    command = "bash ${path.module}/install-helm.sh"
+
+    environment {
+      REGION  = "${var.region}"
+      CLUSTER = "${var.project_name}"
+    }
+  }
+}
 
 # Bootsrap Script for Worker Nodes
 locals {
@@ -221,7 +254,7 @@ resource "aws_autoscaling_group" "voting" {
   max_size             = "${var.eks_max_node_count}"
   min_size             = "${var.eks_min_node_count}"
   name                 = "${var.project_name}"
-  vpc_zone_identifier  = ["${data.aws_subnet_ids.private.ids}"]
+  vpc_zone_identifier  = ["${var.private_subnet_ids}"]
 
   tag {
     key                 = "Name"
@@ -262,7 +295,7 @@ resource "aws_efs_mount_target" "voting" {
   count = 2
 
   file_system_id = "${aws_efs_file_system.voting.id}"
-  subnet_id      = "${element(data.aws_subnet_ids.private.ids, count.index)}"
+  subnet_id      = "${element(var.private_subnet_ids, count.index)}"
 }
 
 # Cluster AutoScaler Role

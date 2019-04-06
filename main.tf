@@ -23,6 +23,7 @@ module "eks" {
   eks_desired_node_count        = "${var.eks_desired_node_count}"
   eks_min_node_count            = "${var.eks_min_node_count}"
   eks_max_node_count            = "${var.eks_max_node_count}"
+  private_subnet_ids            = "${module.vpc.private_subnet_ids}"
 }
 
 # module "workers" {
@@ -52,6 +53,10 @@ module "codebuild" {
 module "pipeline" {
   source       = "./modules/pipeline"
   github_token = "${var.github_token}"
+}
+
+module "dns" {
+  source = "./modules/dns"
 }
 
 # output "tk" {

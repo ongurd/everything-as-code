@@ -94,6 +94,34 @@ resource "aws_codebuild_project" "voting" {
   }
 }
 
+resource "aws_codebuild_project" "voting_deployer" {
+  name          = "voting-deployer"
+  description   = "voting deployer codebuild project"
+  build_timeout = "10"
+  service_role  = "${aws_iam_role.codebuild.arn}"
+
+  artifacts {
+    type = "CODEPIPELINE"
+  }
+
+  cache {
+    type = "NO_CACHE"
+  }
+
+  environment {
+    compute_type                = "BUILD_GENERAL1_SMALL"
+    image                       = "${var.accountId}.dkr.ecr.${var.region}.amazonaws.com/votingapp_deployer:latest"
+    type                        = "LINUX_CONTAINER"
+    image_pull_credentials_type = "SERVICE_ROLE"
+    privileged_mode             = "true"
+  }
+
+  source {
+    type      = "CODEPIPELINE"
+    buildspec = "buildspec_deploy.yml"
+  }
+}
+
 resource "aws_ecr_repository" "vote" {
   name = "votingapp_vote"
 }

@@ -72,6 +72,13 @@ resource "aws_iam_role_policy" "codepipeline_policy" {
             ],
             "Resource": "*",
             "Effect": "Allow"
+        },
+        {
+            "Action": [
+                "codedeploy:*"
+            ],
+            "Resource": "*",
+            "Effect": "Allow"
         }
     ],
     "Version": "2012-10-17"
@@ -123,6 +130,24 @@ resource "aws_codepipeline" "voting_pipeline" {
 
       configuration = {
         ProjectName = "voting-app"
+      }
+    }
+  }
+
+  stage {
+    name = "Deploy"
+
+    action {
+      name             = "Deploy"
+      category         = "Build"
+      owner            = "AWS"
+      provider         = "CodeBuild"
+      input_artifacts  = ["code"]
+      version          = "1"
+      output_artifacts = ["manifest"]
+
+      configuration = {
+        ProjectName = "voting-deployer"
       }
     }
   }

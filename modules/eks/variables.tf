@@ -10,3 +10,7 @@ variable "eks_worker_node_key" {}
 variable "eks_desired_node_count" {}
 variable "eks_min_node_count" {}
 variable "eks_max_node_count" {}
+
+variable "private_subnet_ids" {
+  type = "list"
+}
