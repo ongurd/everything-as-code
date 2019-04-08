@@ -86,7 +86,29 @@ resource "aws_iam_role_policy" "codepipeline_policy" {
 EOF
 }
 
+locals {
+  webhook_secret = "super-secret-to-use-webhook"
+}
+
+resource "null_resource" "eks_endpoint" {
+  triggers {
+    build_number = "${timestamp()}"
+  }
+
+  provisioner "local-exec" {
+    command = "bash ${path.module}/../../scripts/wait_eks.sh"
+
+    environment {
+      REGION_NAME  = "${var.region}"
+      PROFILE_NAME = "kloia"
+      PROJECT_NAME = "${var.project_name}"
+    }
+  }
+}
+
 resource "aws_codepipeline" "voting_pipeline" {
+  depends_on = ["null_resource.eks_endpoint"]
+
   name     = "voting-pipeline"
   role_arn = "${aws_iam_role.codepipeline.arn}"
 
@@ -107,10 +129,10 @@ resource "aws_codepipeline" "voting_pipeline" {
       output_artifacts = ["code"]
 
       configuration = {
-        Owner                = "ongurd"
+        Owner                = "kloia"
         Repo                 = "example-voting-app"
         Branch               = "master"
-        PollForSourceChanges = "true"
+        PollForSourceChanges = "false"
         OAuthToken           = "${var.github_token}"
       }
     }
@@ -151,4 +173,44 @@ resource "aws_codepipeline" "voting_pipeline" {
       }
     }
   }
+}
+
+resource "aws_codepipeline_webhook" "pipeline_webhook" {
+  name            = "github-webhook"
+  authentication  = "GITHUB_HMAC"
+  target_action   = "Source"
+  target_pipeline = "${aws_codepipeline.voting_pipeline.name}"
+
+  authentication_configuration {
+    secret_token = "${local.webhook_secret}"
+  }
+
+  filter {
+    json_path    = "$.ref"
+    match_equals = "refs/heads/{Branch}"
+  }
+}
+
+provider "github" {
+  token        = "${var.github_token}"
+  organization = "kloia"
+}
+
+resource "github_repository_webhook" "github_webhook" {
+  repository = "example-voting-app"
+
+  name = "web"
+
+  configuration {
+    url          = "${aws_codepipeline_webhook.pipeline_webhook.url}"
+    content_type = "json"
+    insecure_ssl = true
+    secret       = "${local.webhook_secret}"
+  }
+
+  events = ["push"]
+}
+
+output "webhook_url" {
+  value = "${aws_codepipeline_webhook.pipeline_webhook.url}"
 }

@@ -53,6 +53,8 @@ module "codebuild" {
 module "pipeline" {
   source       = "./modules/pipeline"
   github_token = "${var.github_token}"
+  region       = "${var.region}"
+  project_name = "${var.project_name}"
 }
 
 module "dns" {
@@ -63,3 +65,6 @@ module "dns" {
 #   value = "${module.eks.tk}"
 # }
 
+output "webhook_url" {
+  value = "${ module.pipeline.webhook_url}"
+}

@@ -164,7 +164,7 @@ resource "null_resource" "eks_endpoint" {
   }
 
   provisioner "local-exec" {
-    command = "bash ${path.module}/wait_eks.sh"
+    command = "bash ${path.module}/../../scripts/wait_eks.sh"
 
     environment {
       REGION_NAME  = "${var.region}"
@@ -210,7 +210,7 @@ resource "null_resource" "helm_init" {
   }
 
   provisioner "local-exec" {
-    command = "bash ${path.module}/install-helm.sh"
+    command = "bash ${path.module}/../../scripts/install-helm.sh"
 
     environment {
       REGION  = "${var.region}"
