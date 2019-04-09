@@ -78,10 +78,10 @@ resource "aws_codebuild_project" "voting" {
     image_pull_credentials_type = "CODEBUILD"
     privileged_mode             = "true"
 
-    environment_variable {
-      "name"  = "AWS_DEFAULT_REGION"
-      "value" = "${var.region}"
-    }
+    # environment_variable {
+    #   "name"  = "AWS_DEFAULT_REGION"
+    #   "value" = "${var.region}"
+    # }
 
     environment_variable {
       "name"  = "AWS_ACCOUNT_ID"
@@ -114,6 +114,11 @@ resource "aws_codebuild_project" "voting_deployer" {
     type                        = "LINUX_CONTAINER"
     image_pull_credentials_type = "SERVICE_ROLE"
     privileged_mode             = "true"
+
+    environment_variable {
+      "name"  = "AWS_ACCOUNT_ID"
+      "value" = "${var.accountId}"
+    }
   }
 
   source {
@@ -122,6 +127,7 @@ resource "aws_codebuild_project" "voting_deployer" {
   }
 }
 
+# ECR Repositories
 resource "aws_ecr_repository" "vote" {
   name = "votingapp_vote"
 }

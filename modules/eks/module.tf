@@ -194,13 +194,6 @@ YAML
   }
 }
 
-# provider "helm" {
-#   install_tiller  = true
-#   namespace       = "kube-system"
-#   service_account = "tiller"
-#   home            = "./.helm"
-# }
-
 # Install Helm Tiller
 resource "null_resource" "helm_init" {
   depends_on = ["kubernetes_config_map.aws_auth"]
@@ -210,11 +203,12 @@ resource "null_resource" "helm_init" {
   }
 
   provisioner "local-exec" {
-    command = "bash ${path.module}/../../scripts/install-helm.sh"
+    command = "bash ${path.module}/../../scripts/post-creation.sh"
 
     environment {
-      REGION  = "${var.region}"
-      CLUSTER = "${var.project_name}"
+      REGION      = "${var.region}"
+      CLUSTER     = "${var.project_name}"
+      AWS_ACCOUNT = "${var.account_id}"
     }
   }
 }
